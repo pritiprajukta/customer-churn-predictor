@@ -7,8 +7,6 @@ import csv
 from datetime import datetime
 import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler as SKScaler
 
 app = Flask(__name__)
 app.secret_key = 'churnai_secret_2026'
@@ -254,19 +252,15 @@ def dashboard():
 def segmentation():
     history = load_from_db()
     segments = []
-    if len(history) >= 3:
-        df = pd.DataFrame(history)
-        features = df[['tenure','monthly','probability']].values
-        sk = SKScaler()
-        scaled = sk.fit_transform(features)
-        km = KMeans(n_clusters=min(3, len(history)),
-                   random_state=42, n_init=10)
-        df['segment'] = km.fit_predict(scaled)
-        labels = {0:'🔴 High Risk',
-                  1:'🟡 Medium Risk',
-                  2:'🟢 Low Risk'}
-        df['segment_label'] = df['segment'].map(labels)
-        segments = df.to_dict('records')
+    for h in history:
+        prob = h['probability']
+        if prob >= 60:
+            h['segment_label'] = '🔴 High Risk'
+        elif prob >= 30:
+            h['segment_label'] = '🟡 Medium Risk'
+        else:
+            h['segment_label'] = '🟢 Low Risk'
+        segments.append(h)
     return render_template('segmentation.html',
                          segments=segments,
                          username=session.get('user'))
