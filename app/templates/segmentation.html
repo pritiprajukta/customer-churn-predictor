@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Segmentation — ChurnAI Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:'Segoe UI',sans-serif;
+            background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);
+            min-height:100vh; color:white;
+        }
+        .navbar {
+            background:rgba(255,255,255,0.05);
+            backdrop-filter:blur(10px);
+            padding:15px 40px;
+            display:flex; justify-content:space-between; align-items:center;
+            border-bottom:1px solid rgba(255,255,255,0.1);
+        }
+        .navbar h1 {
+            font-size:22px;
+            background:linear-gradient(90deg,#00d2ff,#7b2ff7);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+        }
+        .nav-links { display:flex; gap:20px; align-items:center; }
+        .nav-links a { color:rgba(255,255,255,0.7); text-decoration:none; font-size:14px; }
+        .container { max-width:1300px; margin:0 auto; padding:30px 20px; }
+        .page-title {
+            font-size:28px; margin-bottom:10px;
+            background:linear-gradient(90deg,#00d2ff,#7b2ff7);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+        }
+        .subtitle { color:rgba(255,255,255,0.5); margin-bottom:30px; font-size:14px; }
+
+        .seg-grid {
+            display:grid; grid-template-columns:repeat(3,1fr);
+            gap:20px; margin-bottom:30px;
+        }
+        .seg-card {
+            border-radius:16px; padding:25px;
+            border:1px solid rgba(255,255,255,0.1);
+        }
+        .seg-card.high { background:rgba(255,65,108,0.1); border-color:rgba(255,65,108,0.3); }
+        .seg-card.med { background:rgba(247,151,30,0.1); border-color:rgba(247,151,30,0.3); }
+        .seg-card.low { background:rgba(56,239,125,0.1); border-color:rgba(56,239,125,0.3); }
+        .seg-title { font-size:18px; font-weight:700; margin-bottom:15px; }
+        .seg-stat { font-size:13px; color:rgba(255,255,255,0.6); margin:6px 0; }
+        .seg-count {
+            font-size:36px; font-weight:800; margin-bottom:10px;
+        }
+
+        .chart-card {
+            background:rgba(255,255,255,0.05);
+            border:1px solid rgba(255,255,255,0.1);
+            border-radius:16px; padding:25px;
+            margin-bottom:20px;
+        }
+        .chart-card h3 { color:#00d2ff; margin-bottom:15px; }
+
+        .table-card {
+            background:rgba(255,255,255,0.05);
+            border:1px solid rgba(255,255,255,0.1);
+            border-radius:16px; padding:25px;
+        }
+        .table-card h3 { color:#00d2ff; margin-bottom:15px; }
+        table { width:100%; border-collapse:collapse; font-size:13px; }
+        th {
+            background:rgba(0,210,255,0.1); color:#00d2ff;
+            padding:10px 14px; text-align:left; font-size:11px; text-transform:uppercase;
+        }
+        td { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.05); }
+        .badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+        .badge-high { background:rgba(255,65,108,0.2); color:#ff416c; }
+        .badge-med { background:rgba(247,151,30,0.2); color:#f7971e; }
+        .badge-low { background:rgba(56,239,125,0.2); color:#38ef7d; }
+
+        .empty-state {
+            text-align:center; padding:60px;
+            color:rgba(255,255,255,0.4); font-size:16px;
+        }
+        .empty-icon { font-size:60px; margin-bottom:15px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <h1>🔍 ChurnAI Pro</h1>
+    <div class="nav-links">
+        <a href="/">🏠 Home</a>
+        <a href="/dashboard">📊 Dashboard</a>
+        <a href="/segmentation" style="color:#00d2ff;">🗺️ Segments</a>
+        <span style="color:rgba(255,255,255,0.5);font-size:13px;">👤 {{ username }}</span>
+        <a href="/logout" style="color:#ff416c;">🚪 Logout</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="page-title">🗺️ Customer Segmentation</div>
+    <div class="subtitle">
+        AI-powered K-Means clustering groups customers by risk level
+    </div>
+
+    {% if segments %}
+    {% set high_risk = segments|selectattr('segment_label','equalto','🔴 High Risk')|list %}
+    {% set med_risk = segments|selectattr('segment_label','equalto','🟡 Medium Risk')|list %}
+    {% set low_risk = segments|selectattr('segment_label','equalto','🟢 Low Risk')|list %}
+
+    <!-- SEGMENT SUMMARY CARDS -->
+    <div class="seg-grid">
+        <div class="seg-card high">
+            <div class="seg-count" style="color:#ff416c;">{{ high_risk|length }}</div>
+            <div class="seg-title">🔴 High Risk Segment</div>
+            <div class="seg-stat">⚡ Immediate action required</div>
+            <div class="seg-stat">📞 Priority outreach needed</div>
+            <div class="seg-stat">🎁 Offer retention deals</div>
+        </div>
+        <div class="seg-card med">
+            <div class="seg-count" style="color:#f7971e;">{{ med_risk|length }}</div>
+            <div class="seg-title">🟡 Medium Risk Segment</div>
+            <div class="seg-stat">👀 Monitor closely</div>
+            <div class="seg-stat">📧 Send engagement emails</div>
+            <div class="seg-stat">⭐ Enroll in rewards</div>
+        </div>
+        <div class="seg-card low">
+            <div class="seg-count" style="color:#38ef7d;">{{ low_risk|length }}</div>
+            <div class="seg-title">🟢 Low Risk Segment</div>
+            <div class="seg-stat">✅ Loyal customers</div>
+            <div class="seg-stat">🔄 Upsell opportunities</div>
+            <div class="seg-stat">💎 VIP treatment</div>
+        </div>
+    </div>
+
+    <!-- SCATTER CHART -->
+    <div class="chart-card">
+        <h3>📊 Customer Segment Scatter Plot (Tenure vs Monthly Charges)</h3>
+        <canvas id="scatterChart" height="120"></canvas>
+    </div>
+
+    <!-- SEGMENTS TABLE -->
+    <div class="table-card">
+        <h3>📋 All Customer Segments</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th><th>Tenure</th><th>Monthly</th>
+                    <th>Contract</th><th>Risk %</th><th>Segment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in segments %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ s.tenure }} mo</td>
+                    <td>${{ s.monthly }}</td>
+                    <td>{{ s.contract }}</td>
+                    <td>{{ s.probability }}%</td>
+                    <td>
+                        <span class="badge
+                            {% if 'High' in s.segment_label %}badge-high
+                            {% elif 'Medium' in s.segment_label %}badge-med
+                            {% else %}badge-low{% endif %}">
+                            {{ s.segment_label }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    const segments = {{ segments|tojson }};
+    const colors = {'🔴 High Risk':'#ff416c','🟡 Medium Risk':'#f7971e','🟢 Low Risk':'#38ef7d'};
+
+    const datasets = ['🔴 High Risk','🟡 Medium Risk','🟢 Low Risk'].map(label => ({
+        label: label,
+        data: segments
+            .filter(s => s.segment_label === label)
+            .map(s => ({x: s.tenure, y: s.monthly})),
+        backgroundColor: colors[label] + '99',
+        pointRadius: 8
+    }));
+
+    new Chart(document.getElementById('scatterChart'), {
+        type:'scatter',
+        data:{ datasets },
+        options:{
+            plugins:{legend:{labels:{color:'#aaa'}}},
+            scales:{
+                x:{
+                    title:{display:true,text:'Tenure (months)',color:'#aaa'},
+                    ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'}
+                },
+                y:{
+                    title:{display:true,text:'Monthly Charges ($)',color:'#aaa'},
+                    ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'}
+                }
+            }
+        }
+    });
+    </script>
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🗺️</div>
+        <p>Make at least <strong>3 predictions</strong> to see customer segmentation!</p>
+        <p style="margin-top:10px;font-size:13px;">
+            <a href="/" style="color:#00d2ff;">← Go make predictions</a>
+        </p>
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>
