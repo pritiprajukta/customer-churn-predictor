@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import io
 import csv
+import os
 from datetime import datetime
 import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -348,4 +349,8 @@ def export():
     )
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(
+        host='0.0.0.0',
+        port=int(os.environ.get('PORT', 5000)),
+        debug=False
+    )
