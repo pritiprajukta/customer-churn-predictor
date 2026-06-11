@@ -24,7 +24,7 @@
 
 
 ## 🚀 Live Demo
-[Click here to view](https://customer-churn-predictor.onrender.com)
+[Click here to view](https://churnai-pro-jatm.onrender.com)
 
 ## ✨ Features
 - 🔐 Login/Signup Authentication
