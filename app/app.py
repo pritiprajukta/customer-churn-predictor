@@ -6,7 +6,8 @@ import io
 import csv
 import os
 from datetime import datetime
-import mysql.connector
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -16,15 +17,36 @@ model = joblib.load('../models/xgb_model.pkl')
 scaler = joblib.load('../models/scaler.pkl')
 columns = joblib.load('../models/columns.pkl')
 
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': 'Priti@1234',
-    'database': 'churn_db'
-}
+DATABASE_URL = os.environ.get('DATABASE_URL',
+    'postgresql://churnai_pro_user:nNO1KUCv4uDf5FVIqc81zc7qvr0Y9UbX@dpg-d8la46jeo5us73b8itp0-a.singapore-postgres.render.com/churnai_pro')
 
 def get_db():
-    return mysql.connector.connect(**DB_CONFIG)
+    return psycopg2.connect(DATABASE_URL)
+
+def init_db():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE,
+        email VARCHAR(100) UNIQUE,
+        password VARCHAR(255)
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS predictions (
+        id SERIAL PRIMARY KEY,
+        time VARCHAR(20),
+        tenure INTEGER,
+        monthly FLOAT,
+        contract VARCHAR(30),
+        probability FLOAT,
+        result VARCHAR(10),
+        user_id INTEGER
+    )''')
+    conn.commit()
+    c.close()
+    conn.close()
+
+init_db()
 
 def save_user(username, email, password):
     conn = get_db()
@@ -116,45 +138,22 @@ def get_ai_explanation(tenure, monthly, total, contract, probability):
 def get_retention_strategies(tenure, monthly, contract, probability):
     strategies = []
     if probability > 60:
-        strategies.append({
-            'icon': '🎁',
-            'title': 'Offer Loyalty Discount',
-            'desc': 'Provide 20-30% discount on next 3 months bill',
-            'priority': 'HIGH'
-        })
+        strategies.append({'icon':'🎁','title':'Offer Loyalty Discount',
+            'desc':'Provide 20-30% discount on next 3 months bill','priority':'HIGH'})
     if contract == 'Month-to-month':
-        strategies.append({
-            'icon': '📋',
-            'title': 'Upgrade to Annual Contract',
-            'desc': 'Offer free months if customer switches to yearly plan',
-            'priority': 'HIGH'
-        })
+        strategies.append({'icon':'📋','title':'Upgrade to Annual Contract',
+            'desc':'Offer free months if customer switches to yearly plan','priority':'HIGH'})
     if monthly > 70:
-        strategies.append({
-            'icon': '💳',
-            'title': 'Downgrade Plan Option',
-            'desc': 'Suggest a lower cost plan that still meets needs',
-            'priority': 'MEDIUM'
-        })
+        strategies.append({'icon':'💳','title':'Downgrade Plan Option',
+            'desc':'Suggest a lower cost plan that still meets needs','priority':'MEDIUM'})
     if tenure < 12:
-        strategies.append({
-            'icon': '🤝',
-            'title': 'Assign Dedicated Support',
-            'desc': 'Personal account manager for first year customers',
-            'priority': 'MEDIUM'
-        })
-    strategies.append({
-        'icon': '📞',
-        'title': 'Proactive Outreach Call',
-        'desc': 'Schedule a satisfaction call within 48 hours',
-        'priority': 'HIGH' if probability > 50 else 'LOW'
-    })
-    strategies.append({
-        'icon': '⭐',
-        'title': 'Loyalty Rewards Program',
-        'desc': 'Enroll customer in points-based rewards system',
-        'priority': 'LOW'
-    })
+        strategies.append({'icon':'🤝','title':'Assign Dedicated Support',
+            'desc':'Personal account manager for first year customers','priority':'MEDIUM'})
+    strategies.append({'icon':'📞','title':'Proactive Outreach Call',
+        'desc':'Schedule a satisfaction call within 48 hours',
+        'priority':'HIGH' if probability > 50 else 'LOW'})
+    strategies.append({'icon':'⭐','title':'Loyalty Rewards Program',
+        'desc':'Enroll customer in points-based rewards system','priority':'LOW'})
     return strategies
 
 @app.route('/login', methods=['GET','POST'])
@@ -209,44 +208,32 @@ def predict():
     total = float(form['TotalCharges'])
     senior = int(form['SeniorCitizen'])
     contract = form['Contract']
-
     prediction, probability = make_prediction(
         tenure, monthly, total, senior, contract)
-
     result = "⚠️ Customer is likely to CHURN" if prediction == 1 \
              else "✅ Customer will NOT Churn"
     result_short = "CHURN" if prediction == 1 else "SAFE"
-    reasons = get_ai_explanation(
-        tenure, monthly, total, contract, probability)
-    strategies = get_retention_strategies(
-        tenure, monthly, contract, probability)
-
+    reasons = get_ai_explanation(tenure, monthly, total, contract, probability)
+    strategies = get_retention_strategies(tenure, monthly, contract, probability)
     record = {
         'time': datetime.now().strftime("%H:%M:%S"),
-        'tenure': tenure,
-        'monthly': monthly,
-        'contract': contract,
-        'probability': probability,
+        'tenure': tenure, 'monthly': monthly,
+        'contract': contract, 'probability': probability,
         'result': result_short
     }
     save_to_db(record)
     history = load_from_db()
-
     return render_template('index.html',
-                         result=result,
-                         probability=probability,
-                         history=history,
-                         reasons=reasons,
-                         strategies=strategies,
-                         username=session.get('user'))
+                         result=result, probability=probability,
+                         history=history, reasons=reasons,
+                         strategies=strategies, username=session.get('user'))
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     history = load_from_db()
     return render_template('dashboard.html',
-                         history=history,
-                         username=session.get('user'))
+                         history=history, username=session.get('user'))
 
 @app.route('/segmentation')
 @login_required
@@ -263,8 +250,7 @@ def segmentation():
             h['segment_label'] = '🟢 Low Risk'
         segments.append(h)
     return render_template('segmentation.html',
-                         segments=segments,
-                         username=session.get('user'))
+                         segments=segments, username=session.get('user'))
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -279,8 +265,7 @@ def upload():
                 float(row.get('MonthlyCharges', 0)),
                 float(row.get('TotalCharges', 0)),
                 int(row.get('SeniorCitizen', 0)),
-                str(row.get('Contract', 'Month-to-month'))
-            )
+                str(row.get('Contract', 'Month-to-month')))
             record = {
                 'time': datetime.now().strftime("%H:%M:%S"),
                 'tenure': int(row.get('tenure', 0)),
@@ -295,12 +280,9 @@ def upload():
             continue
     history = load_from_db()
     return render_template('index.html',
-                         history=history,
-                         bulk_results=results,
-                         probability=None,
-                         result=None,
-                         reasons=[],
-                         strategies=[],
+                         history=history, bulk_results=results,
+                         probability=None, result=None,
+                         reasons=[], strategies=[],
                          username=session.get('user'))
 
 @app.route('/dashboard-data')
@@ -312,21 +294,15 @@ def dashboard_data():
                        'contracts':{},'timeline':[],'monthly_avg':0})
     churn = sum(1 for h in history if h['result']=='CHURN')
     safe = len(history) - churn
-    avg_prob = round(
-        sum(h['probability'] for h in history)/len(history), 2)
+    avg_prob = round(sum(h['probability'] for h in history)/len(history), 2)
     contracts = {}
     for h in history:
         c = h['contract']
         contracts[c] = contracts.get(c, 0) + 1
-    timeline = [{'time':h['time'],'prob':h['probability']}
-                for h in history[-10:]]
-    monthly_avg = round(
-        sum(h['monthly'] for h in history)/len(history), 2)
-    return jsonify({'churn':churn,'safe':safe,
-                   'avg_prob':avg_prob,
-                   'contracts':contracts,
-                   'timeline':timeline,
-                   'monthly_avg':monthly_avg})
+    timeline = [{'time':h['time'],'prob':h['probability']} for h in history[-10:]]
+    monthly_avg = round(sum(h['monthly'] for h in history)/len(history), 2)
+    return jsonify({'churn':churn,'safe':safe,'avg_prob':avg_prob,
+                   'contracts':contracts,'timeline':timeline,'monthly_avg':monthly_avg})
 
 @app.route('/export')
 @login_required
@@ -336,8 +312,7 @@ def export():
         return "No data", 400
     output = io.StringIO()
     writer = csv.DictWriter(output,
-        fieldnames=['time','tenure','monthly',
-                   'contract','probability','result'])
+        fieldnames=['time','tenure','monthly','contract','probability','result'])
     writer.writeheader()
     writer.writerows(history)
     output.seek(0)
@@ -345,12 +320,10 @@ def export():
         io.BytesIO(output.getvalue().encode()),
         mimetype='text/csv',
         as_attachment=True,
-        download_name='churn_report.csv'
-    )
+        download_name='churn_report.csv')
 
 if __name__ == '__main__':
     app.run(
         host='0.0.0.0',
         port=int(os.environ.get('PORT', 5000)),
-        debug=False
-    )
+        debug=False)
