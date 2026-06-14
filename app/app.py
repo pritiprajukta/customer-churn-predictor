@@ -9,9 +9,12 @@ from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'churnai_secret_2026'
+app.secret_key = os.environ.get('SECRET_KEY', 'churnai_secret_2026')
 
 model = joblib.load('../models/xgb_model.pkl')
 scaler = joblib.load('../models/scaler.pkl')
@@ -90,17 +93,17 @@ def load_from_db():
     conn = get_db()
     c = conn.cursor()
     uid = session.get('user_id', 1)
-    c.execute('''SELECT time,tenure,monthly,contract,
+    c.execute('''SELECT id,time,tenure,monthly,contract,
                  probability,result FROM predictions
                  WHERE user_id=%s ORDER BY id DESC''', (uid,))
     rows = c.fetchall()
     c.close(); conn.close()
-    return [{'time':r[0],
-             'tenure':int(r[1]),
-             'monthly':round(float(r[2]),2),
-             'contract':r[3],
-             'probability':round(float(r[4]),2),
-             'result':r[5]}
+    return [{'id':r[0],'time':r[1],
+             'tenure':int(r[2]),
+             'monthly':round(float(r[3]),2),
+             'contract':r[4],
+             'probability':round(float(r[5]),2),
+             'result':r[6]}
             for r in rows]
 
 def make_prediction(tenure, monthly, total, senior, contract):
@@ -304,6 +307,28 @@ def dashboard_data():
     return jsonify({'churn':churn,'safe':safe,'avg_prob':avg_prob,
                    'contracts':contracts,'timeline':timeline,'monthly_avg':monthly_avg})
 
+@app.route('/delete/<int:record_id>', methods=['POST'])
+@login_required
+def delete_record(record_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM predictions WHERE id=%s AND user_id=%s',
+              (record_id, session.get('user_id', 1)))
+    conn.commit()
+    c.close(); conn.close()
+    return jsonify({'status': 'ok'})
+
+@app.route('/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM predictions WHERE user_id=%s',
+              (session.get('user_id', 1),))
+    conn.commit()
+    c.close(); conn.close()
+    return jsonify({'status': 'cleared'})
+
 @app.route('/export')
 @login_required
 def export():
@@ -321,6 +346,27 @@ def export():
         mimetype='text/csv',
         as_attachment=True,
         download_name='churn_report.csv')
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('error.html',
+        error_code=404,
+        error_message="Page Not Found!",
+        error_description="The page you're looking for doesn't exist."), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return render_template('error.html',
+        error_code=500,
+        error_message="Internal Server Error!",
+        error_description="Something went wrong. We're fixing it!"), 500
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('error.html',
+        error_code=403,
+        error_message="Access Forbidden!",
+        error_description="You don't have permission to access this page."), 403
 
 if __name__ == '__main__':
     app.run(

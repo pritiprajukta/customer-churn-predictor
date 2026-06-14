@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - ChurnAI Pro</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:'Segoe UI',sans-serif;
+            background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);
+            min-height:100vh; color:#ffffff;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .error-container {
+            text-align:center; padding:40px;
+        }
+        .error-code {
+            font-size:120px; font-weight:800;
+            background:linear-gradient(90deg,#00d2ff,#7b2ff7);
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            line-height:1;
+        }
+        .error-msg {
+            font-size:24px; margin:20px 0;
+            color:rgba(255,255,255,0.8);
+        }
+        .error-sub {
+            font-size:14px; color:rgba(255,255,255,0.5);
+            margin-bottom:30px;
+        }
+        .home-btn {
+            background:linear-gradient(90deg,#00d2ff,#7b2ff7);
+            color:white; padding:12px 30px;
+            border-radius:25px; text-decoration:none;
+            font-weight:700; font-size:15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-code">{{ error_code }}</div>
+        <div class="error-msg">{{ error_message }}</div>
+        <div class="error-sub">{{ error_description }}</div>
+        <a href="/" class="home-btn">🏠 Go Home</a>
+    </div>
+</body>
+</html>
